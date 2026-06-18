@@ -58,34 +58,29 @@ No subas un `.env` real al repositorio.
 3. Añade `NEXTAUTH_URL` con la URL pública exacta de producción, por ejemplo `https://farmahub360.vercel.app`.
 4. Añade `NEXTAUTH_SECRET` con un valor largo y aleatorio.
 5. Añade `SEED_SECRET` con un valor largo, aleatorio y privado. Este valor protege la ruta temporal de inicialización.
-6. Haz redeploy del proyecto para que Vercel cargue las nuevas variables y el cliente Prisma generado.
-7. Inicializa producción desde el navegador con la ruta segura:
+6. Comprueba que el comando de build de Vercel ejecuta las migraciones antes de compilar Next.js:
+
+   ```bash
+   prisma generate && prisma migrate deploy && next build
+   ```
+
+   Este repositorio ya configura ese flujo en el script `build`. No uses `prisma migrate dev` en producción.
+7. Haz redeploy del proyecto para que Vercel cargue las nuevas variables, genere el cliente Prisma, ejecute `prisma migrate deploy` contra Neon y compile la aplicación.
+8. Inicializa el seed idempotente de producción desde el navegador con la ruta segura:
 
    ```text
    https://farmahub360.vercel.app/api/admin/init?secret=VALOR_DE_SEED_SECRET
    ```
 
-   La ruta comprueba `SEED_SECRET`, intenta ejecutar `prisma migrate deploy`, verifica si existen las tablas principales y ejecuta el seed idempotente. Si Vercel no permite completar las migraciones desde una función serverless, la respuesta JSON indicará el error y deberás ejecutar contra la misma `DATABASE_URL`:
-
-   ```bash
-   npm run prisma:migrate:deploy
-   npm run prisma:seed
-   ```
-
-   También puedes ejecutar ambos pasos con:
-
-   ```bash
-   npm run db:init
-   ```
-
-8. Vuelve al login y entra con:
+   La ruta comprueba `SEED_SECRET`, verifica la conexión con Prisma, confirma que las tablas ya existen y ejecuta solo el seed idempotente. No instala dependencias ni ejecuta migraciones desde runtime. Si la tabla `User` aún no existe, devolverá un JSON claro indicando que debes ejecutar `prisma migrate deploy` durante el build/deploy.
+9. Vuelve al login y entra con:
 
    ```text
    admin@farmahub360.local
    Demo1234!
    ```
 
-Después de aplicar las migraciones y el seed debe existir la tabla `public."User"` en Neon, debe existir el usuario administrador inicial y el login debe funcionar.
+Después del próximo deploy, `prisma migrate deploy` debe ejecutarse en build, debe existir la tabla `public."User"` en Neon, `/api/admin/init` debe crear el usuario administrador inicial y el login debe funcionar.
 
 ## Scripts útiles
 
