@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import { NextResponse } from 'next/server';
@@ -8,7 +6,9 @@ import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const execFileAsync = promisify(execFile);
+const adminEmail = 'admin@farmahub360.local';
+const adminPassword = 'Demo1234!';
+const adminName = 'Administrador FarmaHub360';
 
 const initialAreaNames = [
   'Consultas externas',
@@ -25,65 +25,68 @@ const initialAreaNames = [
   'Otra'
 ];
 
+async function checkDatabaseConnection() {
+  await prisma.$queryRaw`SELECT 1`;
+}
+
 async function tableExists(tableName: string) {
   const rows = await prisma.$queryRaw<{ exists: boolean }[]>`
-    SELECT to_regclass(${`public."${tableName}"`}) IS NOT NULL AS exists
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    ) AS exists
   `;
+
   return Boolean(rows[0]?.exists);
 }
 
-async function runMigrations() {
-  try {
-    const { stdout, stderr } = await execFileAsync('npx', ['prisma', 'migrate', 'deploy'], {
-      cwd: process.cwd(),
-      env: process.env,
-      timeout: 55_000,
-      maxBuffer: 1024 * 1024
-    });
-    return { attempted: true, ok: true, message: 'prisma migrate deploy ejecutado correctamente.', stdout, stderr };
-  } catch (error) {
-    const details = error instanceof Error ? error.message : String(error);
-    return {
-      attempted: true,
-      ok: false,
-      message: 'No se pudo ejecutar prisma migrate deploy desde la ruta API. Ejecuta npm run prisma:migrate:deploy o npm run db:init en un entorno con acceso a DATABASE_URL si las tablas aún no existen.',
-      error: details
-    };
-  }
+async function getMissingRequiredTables() {
+  const requiredTables = ['User', 'Area'];
+  const checks = await Promise.all(requiredTables.map(async (tableName) => ({
+    tableName,
+    exists: await tableExists(tableName)
+  })));
+
+  return checks.filter(({ exists }) => !exists).map(({ tableName }) => tableName);
 }
 
 async function ensureInitialAreas() {
-  let createdCount = 0;
+  const result = await prisma.area.createMany({
+    data: initialAreaNames.map((name) => ({ name })),
+    skipDuplicates: true
+  });
 
-  for (const name of initialAreaNames) {
-    const existing = await prisma.area.findUnique({ where: { name } });
-    if (!existing) {
-      await prisma.area.create({ data: { name } });
-      createdCount += 1;
-    }
-  }
-
-  return createdCount > 0 ? 'created' : 'already_exists';
+  return {
+    status: result.count > 0 ? 'created' : 'already_exists',
+    createdCount: result.count
+  };
 }
 
 async function ensureAdminUser() {
-  const existingAdmin = await prisma.user.findUnique({ where: { email: 'admin@farmahub360.local' } });
-  if (existingAdmin) return 'already_exists';
+  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (existingAdmin) {
+    return { status: 'already_exists', email: adminEmail };
+  }
 
-  const areas = await prisma.area.findMany({ where: { name: { in: initialAreaNames } }, select: { id: true } });
-  const passwordHash = await hash('Demo1234!', 12);
+  const areas = await prisma.area.findMany({
+    where: { name: { in: initialAreaNames } },
+    select: { id: true }
+  });
+  const passwordHash = await hash(adminPassword, 12);
 
   await prisma.user.create({
     data: {
-      name: 'Administrador FarmaHub360',
-      email: 'admin@farmahub360.local',
+      name: adminName,
+      email: adminEmail,
       passwordHash,
       role: Role.ADMIN,
       areas: { connect: areas.map((area) => ({ id: area.id })) }
     }
   });
 
-  return 'created';
+  return { status: 'created', email: adminEmail };
 }
 
 export async function GET(request: Request) {
@@ -97,19 +100,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: 'Secret inválido.' }, { status: 401 });
   }
 
-  const migrations = await runMigrations();
-
   try {
-    const userTableExists = await tableExists('User');
-    const areaTableExists = await tableExists('Area');
-    const tables = { User: userTableExists, Area: areaTableExists };
+    await checkDatabaseConnection();
 
-    if (!userTableExists || !areaTableExists) {
+    const missingTables = await getMissingRequiredTables();
+    if (missingTables.length > 0) {
       return NextResponse.json({
         ok: false,
-        message: 'La base de datos aún no tiene las tablas necesarias. Revisa migrations y ejecuta npm run prisma:migrate:deploy contra Neon si Vercel no pudo hacerlo desde esta ruta.',
-        migrations,
-        tables
+        message: 'Database schema is not migrated. Run prisma migrate deploy during build/deploy.',
+        missingTables
       }, { status: 500 });
     }
 
@@ -120,12 +119,10 @@ export async function GET(request: Request) {
       ok: true,
       message: 'FarmaHub360 database initialized',
       adminUser,
-      areas,
-      migrations,
-      tables
+      areas
     });
   } catch (error) {
     const details = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ ok: false, message: 'No se pudo inicializar la base de datos.', migrations, error: details }, { status: 500 });
+    return NextResponse.json({ ok: false, message: 'No se pudo inicializar la base de datos.', error: details }, { status: 500 });
   }
 }
