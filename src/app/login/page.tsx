@@ -1,0 +1,4 @@
+'use client';
+import { signIn } from 'next-auth/react';
+import { useState } from 'react';
+export default function Login(){const [error,setError]=useState('');return <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6"><form className="card w-full max-w-md space-y-4" onSubmit={async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const r=await signIn('credentials',{email:f.get('email'),password:f.get('password'),redirect:true,callbackUrl:'/'}); if(r?.error)setError('Credenciales no válidas');}}><h1 className="text-2xl font-bold">Entrar en FarmaHub360</h1><p className="text-sm text-slate-600">Demo: admin@farmahub360.local / Demo1234!</p><input className="input" name="email" type="email" placeholder="Email" required/><input className="input" name="password" type="password" placeholder="Contraseña" required/>{error&&<p className="text-sm text-red-600">{error}</p>}<button className="btn w-full">Entrar</button></form></main>}
