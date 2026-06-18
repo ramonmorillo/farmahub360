@@ -1,139 +1,360 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-
-enum Role { ADMIN JEFATURA COORDINADOR_AREA FARMACEUTICO TECNICO ADMINISTRATIVO INVITADO }
-enum Priority { BAJA MEDIA ALTA CRITICA }
-enum Status { PENDIENTE EN_CURSO BLOQUEADA COMPLETADA CANCELADA }
-enum Visibility { GLOBAL AREA ASSIGNED LEADERSHIP CUSTOM }
-enum EventType { REUNION SESION_CLINICA COMITE AUDITORIA GUARDIA FORMACION VISITA PLAZO RECORDATORIO OTRO }
-enum IncidentCategory { CIRCUITO_ASISTENCIAL STOCK_DESABASTECIMIENTO PRESCRIPCION DISPENSACION SISTEMAS_INFORMACION DOCUMENTACION COORDINACION CALIDAD OTRO }
-enum EntityType { EVENT TASK INCIDENT PROJECT AREA USER }
-
-model User {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  passwordHash String
-  role Role @default(INVITADO)
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
-  areas Area[] @relation("UserAreas")
-  assignedTasks Task[] @relation("TaskAssignees")
-  assignedEvents Event[] @relation("EventAssignees")
-  projectParticipants Project[] @relation("ProjectParticipants")
-  customTasks Task[] @relation("TaskCustomViewers")
-  customEvents Event[] @relation("EventCustomViewers")
-  customIncidents Incident[] @relation("IncidentCustomViewers")
-  customProjects Project[] @relation("ProjectCustomViewers")
-  responsibleTasks Task[] @relation("TaskResponsible")
-  createdTasks Task[] @relation("TaskCreatedBy")
-  responsibleEvents Event[] @relation("EventResponsible")
-  createdEvents Event[] @relation("EventCreatedBy")
-  responsibleIncidents Incident[] @relation("IncidentResponsible")
-  createdIncidents Incident[] @relation("IncidentCreatedBy")
-  responsibleProjects Project[] @relation("ProjectResponsible")
-  createdProjects Project[] @relation("ProjectCreatedBy")
-  comments Comment[]
+generator client {
+  provider = "prisma-client-js"
 }
 
-model Area { id String @id @default(cuid()) name String @unique createdAt DateTime @default(now()) users User[] @relation("UserAreas") events Event[] tasks Task[] incidents Incident[] projects Project[] }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  JEFATURA
+  COORDINADOR_AREA
+  FARMACEUTICO
+  TECNICO
+  ADMINISTRATIVO
+  INVITADO
+}
+
+enum Priority {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum Status {
+  PENDIENTE
+  EN_CURSO
+  BLOQUEADA
+  COMPLETADA
+  CANCELADA
+}
+
+enum Visibility {
+  GLOBAL
+  AREA
+  ASSIGNED
+  LEADERSHIP
+  CUSTOM
+}
+
+enum EventType {
+  REUNION
+  SESION_CLINICA
+  COMITE
+  AUDITORIA
+  GUARDIA
+  FORMACION
+  VISITA
+  PLAZO
+  RECORDATORIO
+  OTRO
+}
+
+enum IncidentCategory {
+  CIRCUITO_ASISTENCIAL
+  STOCK_DESABASTECIMIENTO
+  PRESCRIPCION
+  DISPENSACION
+  SISTEMAS_INFORMACION
+  DOCUMENTACION
+  COORDINACION
+  CALIDAD
+  OTRO
+}
+
+enum EntityType {
+  EVENT
+  TASK
+  INCIDENT
+  PROJECT
+  AREA
+  USER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(INVITADO)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  areas Area[] @relation("UserAreas")
+
+  taskAssignments     TaskAssignee[]
+  eventAssignments    EventAssignee[]
+  incidentAssignments IncidentAssignee[]
+  projectParticipants ProjectParticipant[]
+  customVisibility    CustomVisibility[]
+
+  responsibleTasks     Task[]     @relation("TaskResponsible")
+  createdTasks         Task[]     @relation("TaskCreatedBy")
+  responsibleEvents    Event[]    @relation("EventResponsible")
+  createdEvents        Event[]    @relation("EventCreatedBy")
+  responsibleIncidents Incident[] @relation("IncidentResponsible")
+  createdIncidents     Incident[] @relation("IncidentCreatedBy")
+  responsibleProjects  Project[]  @relation("ProjectResponsible")
+  createdProjects      Project[]  @relation("ProjectCreatedBy")
+
+  comments  Comment[]
+  auditLogs AuditLog[]
+}
+
+model Area {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  users     User[]     @relation("UserAreas")
+  events    Event[]
+  tasks     Task[]
+  incidents Incident[]
+  projects  Project[]
+}
 
 model Event {
-  id String @id @default(cuid())
-  title String
+  id          String    @id @default(cuid())
+  title       String
   description String?
-  type EventType @default(OTRO)
-  startAt DateTime
-  endAt DateTime
+  type        EventType @default(OTRO)
+  startAt     DateTime
+  endAt       DateTime
+
   areaId String?
-  area Area? @relation(fields:[areaId], references:[id])
+  area   Area?   @relation(fields: [areaId], references: [id])
+
   responsibleId String?
-  responsible User? @relation("EventResponsible", fields:[responsibleId], references:[id])
-  assignees User[] @relation("EventAssignees")
-  priority Priority @default(MEDIA)
-  status Status @default(PENDIENTE)
+  responsible   User?   @relation("EventResponsible", fields: [responsibleId], references: [id])
+
+  priority   Priority   @default(MEDIA)
+  status     Status     @default(PENDIENTE)
   visibility Visibility @default(GLOBAL)
-  customViewers User[] @relation("EventCustomViewers")
+
   createdById String
-  createdBy User @relation("EventCreatedBy", fields:[createdById], references:[id])
-  comments Comment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy   User   @relation("EventCreatedBy", fields: [createdById], references: [id])
+
+  assignees        EventAssignee[]
+  customVisibility CustomVisibility[]
+  comments         Comment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 }
 
 model Task {
-  id String @id @default(cuid())
-  title String
+  id          String  @id @default(cuid())
+  title       String
   description String?
+
   areaId String?
-  area Area? @relation(fields:[areaId], references:[id])
+  area   Area?   @relation(fields: [areaId], references: [id])
+
   responsibleId String?
-  responsible User? @relation("TaskResponsible", fields:[responsibleId], references:[id])
-  assignees User[] @relation("TaskAssignees")
-  dueDate DateTime?
-  priority Priority @default(MEDIA)
-  status Status @default(PENDIENTE)
+  responsible   User?   @relation("TaskResponsible", fields: [responsibleId], references: [id])
+
+  dueDate    DateTime?
+  priority   Priority  @default(MEDIA)
+  status     Status    @default(PENDIENTE)
   visibility Visibility @default(GLOBAL)
-  links String[]
-  customViewers User[] @relation("TaskCustomViewers")
+  links      String[]
+
   projectId String?
-  project Project? @relation(fields:[projectId], references:[id])
+  project   Project? @relation(fields: [projectId], references: [id])
+
   createdById String
-  createdBy User @relation("TaskCreatedBy", fields:[createdById], references:[id])
-  comments Comment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  assignees        TaskAssignee[]
+  customVisibility CustomVisibility[]
+  comments         Comment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 }
 
 model Incident {
-  id String @id @default(cuid())
-  title String
+  id          String           @id @default(cuid())
+  title       String
   description String?
-  category IncidentCategory @default(OTRO)
+  category    IncidentCategory @default(OTRO)
+
   areaId String?
-  area Area? @relation(fields:[areaId], references:[id])
+  area   Area?   @relation(fields: [areaId], references: [id])
+
   responsibleId String?
-  responsible User? @relation("IncidentResponsible", fields:[responsibleId], references:[id])
-  priority Priority @default(MEDIA)
-  status Status @default(PENDIENTE)
-  detectedAt DateTime @default(now())
+  responsible   User?   @relation("IncidentResponsible", fields: [responsibleId], references: [id])
+
+  priority   Priority  @default(MEDIA)
+  status     Status    @default(PENDIENTE)
+  detectedAt DateTime  @default(now())
   resolvedAt DateTime?
-  actions String?
+  actions    String?
   visibility Visibility @default(GLOBAL)
-  customViewers User[] @relation("IncidentCustomViewers")
+
   createdById String
-  createdBy User @relation("IncidentCreatedBy", fields:[createdById], references:[id])
-  comments Comment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy   User   @relation("IncidentCreatedBy", fields: [createdById], references: [id])
+
+  assignees        IncidentAssignee[]
+  customVisibility CustomVisibility[]
+  comments         Comment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 }
 
 model Project {
-  id String @id @default(cuid())
-  name String
+  id          String  @id @default(cuid())
+  name        String
   description String?
+
   areaId String?
-  area Area? @relation(fields:[areaId], references:[id])
+  area   Area?   @relation(fields: [areaId], references: [id])
+
   responsibleId String?
-  responsible User? @relation("ProjectResponsible", fields:[responsibleId], references:[id])
-  participants User[] @relation("ProjectParticipants")
-  startDate DateTime?
+  responsible   User?   @relation("ProjectResponsible", fields: [responsibleId], references: [id])
+
+  startDate       DateTime?
   expectedEndDate DateTime?
-  status Status @default(EN_CURSO)
-  priority Priority @default(MEDIA)
-  visibility Visibility @default(GLOBAL)
-  customViewers User[] @relation("ProjectCustomViewers")
-  tasks Task[]
+  status          Status    @default(EN_CURSO)
+  priority        Priority  @default(MEDIA)
+  visibility      Visibility @default(GLOBAL)
+
   createdById String
-  createdBy User @relation("ProjectCreatedBy", fields:[createdById], references:[id])
-  comments Comment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy   User   @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+
+  participants     ProjectParticipant[]
+  customVisibility CustomVisibility[]
+  tasks            Task[]
+  comments         Comment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 }
 
-model Comment { id String @id @default(cuid()) entityType EntityType entityId String text String userId String user User @relation(fields:[userId], references:[id]) createdAt DateTime @default(now()) }
-model AuditLog { id String @id @default(cuid()) userId String? action String entityType EntityType entityId String createdAt DateTime @default(now()) summary String }
+model TaskAssignee {
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([taskId, userId])
+}
+
+model EventAssignee {
+  eventId String
+  userId  String
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([eventId, userId])
+}
+
+model IncidentAssignee {
+  incidentId String
+  userId     String
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([incidentId, userId])
+}
+
+model ProjectParticipant {
+  projectId String
+  userId    String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+
+  @@id([projectId, userId])
+}
+
+model CustomVisibility {
+  id     String @id @default(cuid())
+  userId String
+
+  taskId     String?
+  eventId    String?
+  incidentId String?
+  projectId  String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task     Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  event    Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskId])
+  @@unique([userId, eventId])
+  @@unique([userId, incidentId])
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([taskId])
+  @@index([eventId])
+  @@index([incidentId])
+  @@index([projectId])
+}
+
+model Comment {
+  id         String     @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  text       String
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  taskId     String?
+  eventId    String?
+  incidentId String?
+  projectId  String?
+
+  task     Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  event    Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([authorId])
+  @@index([entityType, entityId])
+  @@index([taskId])
+  @@index([eventId])
+  @@index([incidentId])
+  @@index([projectId])
+}
+
+model AuditLog {
+  id         String     @id @default(cuid())
+  userId     String?
+  action     String
+  entityType EntityType
+  entityId   String
+  createdAt  DateTime   @default(now())
+  summary    String
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+}
