@@ -6,3 +6,10 @@ body { @apply bg-slate-100 text-slate-900; }
 .input { @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm; }
 .btn { @apply rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800; }
 .badge { @apply rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700; }
+@media print {
+  .print\:hidden { display: none !important; }
+  body { background: white !important; }
+}
+@media screen, print {
+  th, td { border-bottom: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; vertical-align: top; }
+}

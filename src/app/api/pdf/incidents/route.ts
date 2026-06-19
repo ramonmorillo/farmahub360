@@ -10,6 +10,6 @@ function filters(url: URL) { const where: any = {}; const q = url.searchParams.g
 export async function GET(request: Request) {
   const user = await requireUser();
   const rows = await prisma.incident.findMany({ where: { AND: [secureWhere(user, false, false), filters(new URL(request.url))] }, include: { area: true, responsible: true }, orderBy: { updatedAt: 'desc' }, take: 200 });
-  const pdf = basicPdf('Listado filtrado de incidencias', `${rows.length} incidencias visibles según filtros activos`, [{ heading: 'Incidencias', lines: rows.map((r) => `${r.title} | ${r.category} | ${r.area?.name ?? 'Sin área'} | ${r.responsible?.name ?? 'Sin responsable'} | ${statusLabels[r.status]} | ${priorityLabels[r.priority]} | ${r.detectedAt.toLocaleDateString('es-ES')}`) }]);
+  const pdf = basicPdf('Listado filtrado de incidencias', `${rows.length} incidencias visibles según filtros activos`, [{ heading: 'Incidencias', lines: rows.length ? rows.map((r) => `${r.title} | ${r.category} | ${r.area?.name ?? 'Sin área'} | ${r.responsible?.name ?? 'Sin responsable'} | ${statusLabels[r.status]} | ${priorityLabels[r.priority]} | ${r.detectedAt.toLocaleDateString('es-ES')}`) : ['No existen registros para los filtros seleccionados.'] }]);
   return new NextResponse(pdf, { headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="incidencias.pdf"' } });
 }
