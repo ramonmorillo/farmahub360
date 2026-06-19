@@ -11,18 +11,21 @@ const adminPassword = 'Demo1234!';
 const adminName = 'Administrador FarmaHub360';
 
 const initialAreaNames = [
+  'Dirección / coordinación',
   'Consultas externas',
-  'Oncohematología',
+  'Hospital de día / oncohematología',
   'Ensayos clínicos',
   'Farmacotecnia',
-  'Unidosis',
-  'Gestión',
-  'Calidad',
+  'Nutrición / mezclas intravenosas',
+  'Unidosis / hospitalización',
+  'Urgencias / críticos',
+  'Gestión de adquisiciones',
+  'Logística / almacén',
+  'Calidad / seguridad',
   'Docencia',
-  'Investigación',
-  'Logística',
-  'Dirección / coordinación',
-  'Otra'
+  'Investigación / innovación',
+  'Sistemas de información',
+  'Guardias'
 ];
 
 async function checkDatabaseConnection() {

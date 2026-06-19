@@ -2,18 +2,21 @@ import { Area, PrismaClient, Role, User } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 const areaNames = [
+  'Dirección / coordinación',
   'Consultas externas',
-  'Oncohematología',
+  'Hospital de día / oncohematología',
   'Ensayos clínicos',
   'Farmacotecnia',
-  'Unidosis',
-  'Gestión',
-  'Calidad',
+  'Nutrición / mezclas intravenosas',
+  'Unidosis / hospitalización',
+  'Urgencias / críticos',
+  'Gestión de adquisiciones',
+  'Logística / almacén',
+  'Calidad / seguridad',
   'Docencia',
-  'Investigación',
-  'Logística',
-  'Dirección / coordinación',
-  'Otra'
+  'Investigación / innovación',
+  'Sistemas de información',
+  'Guardias'
 ];
 
 type SeedResult = {
@@ -63,7 +66,7 @@ export async function seedDatabase(prisma: PrismaClient = new PrismaClient()): P
 
   const demoUsers = [
     { email: 'jefatura@farmahub360.local', name: 'Jefatura Demo', role: Role.JEFATURA, areaNames: ['Dirección / coordinación'] },
-    { email: 'farmaceutico@farmahub360.local', name: 'Farmacéutico Demo', role: Role.FARMACEUTICO, areaNames: ['Oncohematología', 'Calidad'] }
+    { email: 'farmaceutico@farmahub360.local', name: 'Farmacéutico Demo', role: Role.FARMACEUTICO, areaNames: ['Hospital de día / oncohematología', 'Calidad / seguridad'] }
   ];
 
   const users = { admin } as Record<string, User>;
@@ -84,19 +87,19 @@ export async function seedDatabase(prisma: PrismaClient = new PrismaClient()): P
 
   if (await prisma.task.count() === 0) {
     await prisma.task.createMany({ data: [
-      { title: 'Revisar procedimiento de dispensación', description: 'Actualizar el circuito interno y validar con Calidad.', areaId: by('Calidad').id, responsibleId: users.farmaceutico.id, dueDate: new Date(Date.now() + 86400000 * 7), priority: 'ALTA', status: 'EN_CURSO', visibility: 'AREA', createdById: users.jefatura.id },
-      { title: 'Planificar inventario trimestral', description: 'Coordinar con logística y técnicos.', areaId: by('Logística').id, responsibleId: admin.id, dueDate: new Date(Date.now() + 86400000 * 14), priority: 'MEDIA', status: 'PENDIENTE', visibility: 'GLOBAL', createdById: admin.id }
+      { title: 'Revisar procedimiento de dispensación', description: 'Actualizar el circuito interno y validar con Calidad.', areaId: by('Calidad / seguridad').id, responsibleId: users.farmaceutico.id, dueDate: new Date(Date.now() + 86400000 * 7), priority: 'ALTA', status: 'EN_CURSO', visibility: 'AREA', createdById: users.jefatura.id },
+      { title: 'Planificar inventario trimestral', description: 'Coordinar con logística y técnicos.', areaId: by('Logística / almacén').id, responsibleId: admin.id, dueDate: new Date(Date.now() + 86400000 * 14), priority: 'MEDIA', status: 'PENDIENTE', visibility: 'GLOBAL', createdById: admin.id }
     ] });
     result.demoCreated.tasks = 2;
   }
 
   if (await prisma.event.count() === 0) {
-    await prisma.event.create({ data: { title: 'Comité de seguridad', description: 'Revisión mensual de incidencias.', type: 'COMITE', startAt: new Date(Date.now() + 86400000 * 3), endAt: new Date(Date.now() + 86400000 * 3 + 3600000), areaId: by('Calidad').id, responsibleId: users.jefatura.id, priority: 'MEDIA', status: 'PENDIENTE', visibility: 'GLOBAL', createdById: users.jefatura.id } });
+    await prisma.event.create({ data: { title: 'Comité de seguridad', description: 'Revisión mensual de incidencias.', type: 'COMITE', startAt: new Date(Date.now() + 86400000 * 3), endAt: new Date(Date.now() + 86400000 * 3 + 3600000), areaId: by('Calidad / seguridad').id, responsibleId: users.jefatura.id, priority: 'MEDIA', status: 'PENDIENTE', visibility: 'GLOBAL', createdById: users.jefatura.id } });
     result.demoCreated.events = 1;
   }
 
   if (await prisma.incident.count() === 0) {
-    await prisma.incident.create({ data: { title: 'Incidencia de stock crítico', description: 'Comunicación interna y alternativas disponibles.', category: 'STOCK_DESABASTECIMIENTO', areaId: by('Logística').id, responsibleId: admin.id, priority: 'CRITICA', status: 'EN_CURSO', visibility: 'GLOBAL', createdById: admin.id } });
+    await prisma.incident.create({ data: { title: 'Incidencia de stock crítico', description: 'Comunicación interna y alternativas disponibles.', category: 'STOCK_DESABASTECIMIENTO', areaId: by('Logística / almacén').id, responsibleId: admin.id, priority: 'CRITICA', status: 'EN_CURSO', visibility: 'GLOBAL', createdById: admin.id } });
     result.demoCreated.incidents = 1;
   }
 
