@@ -1,5 +1,6 @@
 'use server';
 
+import { Prisma, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { hash } from 'bcryptjs';
@@ -18,6 +19,23 @@ const date = (fd: FormData, k: string) => opt(fd,k) ? new Date(str(fd,k)) : unde
 const list = (fd: FormData, k: string) => fd.getAll(k).map(String).filter(Boolean);
 async function current() { return requireUser(); }
 
+function usersRedirect(message: string, type: 'success'|'error' = 'error'): never {
+  redirect(`/users?${new URLSearchParams({ [type]: message }).toString()}`);
+}
+
+function logCreateUserFailed(email: string, role: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error({ action: 'create_user_failed', email, role, message });
+}
+
+function isRedirectError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'digest' in error && String((error as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT');
+}
+
+function parseRole(role: string): Role | null {
+  return Object.values(Role).includes(role as Role) ? role as Role : null;
+}
+
 export async function saveArea(fd: FormData) {
   const user = await current(); if (!canManageUsers(user)) throw new Error('No autorizado');
   const id = opt(fd,'id'); const name = str(fd,'name');
@@ -34,11 +52,62 @@ export async function ensureInitialAreasAction() {
 
 export async function saveUser(fd: FormData) {
   const user = await current(); if (!canManageUsers(user)) throw new Error('No autorizado');
-  const id = opt(fd,'id'); const areaIds = list(fd,'areaIds'); const password = opt(fd,'password');
-  const base:any = { name: str(fd,'name'), email: str(fd,'email').toLowerCase(), role: str(fd,'role') as any, active: fd.get('active') === 'on', areas:{ set: areaIds.map(id=>({id})) } };
-  if (password) base.passwordHash = await hash(password, 12);
-  if (id) await prisma.user.update({ where:{id}, data: base }); else await prisma.user.create({ data:{...base, passwordHash: await hash(password || 'FarmaHub360!', 12)} });
+  const id = opt(fd,'id');
+  const name = str(fd,'name');
+  const email = str(fd,'email').toLowerCase();
+  const roleInput = str(fd,'role');
+  const role = parseRole(roleInput);
+  const active = fd.get('active') === 'on';
+  const areaIds = list(fd,'areaIds');
+  const password = opt(fd,'password');
+
+  if (!role) {
+    if (!id) logCreateUserFailed(email, roleInput, new Error('Invalid role'));
+    usersRedirect('Rol no válido.');
+  }
+
+  try {
+    if (areaIds.length) {
+      const existingAreas = await prisma.area.count({ where: { id: { in: areaIds } } });
+      if (existingAreas !== new Set(areaIds).size) usersRedirect('Error al asignar áreas.');
+    }
+
+    const duplicate = await prisma.user.findFirst({ where: { email, NOT: id ? { id } : undefined }, select: { id: true } });
+    if (duplicate) usersRedirect('Ya existe un usuario con ese email.');
+
+    const areaRelation = { set: areaIds.map(areaId => ({ id: areaId })) };
+
+    if (id) {
+      const data: Prisma.UserUpdateInput = {
+        name,
+        email,
+        role,
+        active,
+        areas: areaRelation
+      };
+      if (password) data.passwordHash = await hash(password, 12);
+      await prisma.user.update({ where: { id }, data });
+    } else {
+      const passwordHash = await hash(password || 'FarmaHub360!', 12);
+      const data: Prisma.UserCreateInput = {
+        name,
+        email,
+        passwordHash,
+        role,
+        active,
+        areas: areaIds.length ? { connect: areaIds.map(areaId => ({ id: areaId })) } : undefined
+      };
+      await prisma.user.create({ data });
+    }
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+    if (!id) logCreateUserFailed(email, roleInput, error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') usersRedirect('Ya existe un usuario con ese email.');
+    usersRedirect('No se pudo crear el usuario.');
+  }
+
   revalidatePath('/users');
+  usersRedirect(id ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.', 'success');
 }
 
 export async function resetPassword(fd: FormData) {
@@ -57,7 +126,6 @@ async function syncLinks(kind: Entity, id: string, userIds: string[]) {
   await map[kind].deleteMany({ where:{ [fk[kind]]: id } });
   if (userIds.length) await map[kind].createMany({ data:userIds.map(userId=>({ [fk[kind]]:id, userId })), skipDuplicates:true });
 }
-
 export async function saveTask(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ title:str(fd,'title'), description:opt(fd,'description'), areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), dueDate:date(fd,'dueDate'), priority:str(fd,'priority')||'MEDIA', status:str(fd,'status')||'PENDIENTE', visibility:str(fd,'visibility')||'GLOBAL', projectId:opt(fd,'projectId') };
  const row=id?await prisma.task.update({where:{id},data}):await prisma.task.create({data:{...data,createdById:user.id}}); await syncLinks('task',row.id,list(fd,'assigneeIds')); await syncComments('task',row.id,str(fd,'comment'),user.id); await audit(user.id,id?'UPDATE':'CREATE','TASK',row.id,row.title); revalidatePath('/tasks'); redirect('/tasks'); }
 export async function deleteTask(fd: FormData) { const user=await current(); await prisma.task.update({where:{id:str(fd,'id')},data:{deletedAt:new Date(),status:'CANCELADA'}}); revalidatePath('/tasks'); }
