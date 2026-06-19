@@ -82,6 +82,19 @@ No subas un `.env` real al repositorio.
 
 Después del próximo deploy, `prisma migrate deploy` debe ejecutarse en build, debe existir la tabla `public."User"` en Neon, `/api/admin/init` debe crear el usuario administrador inicial y el login debe funcionar.
 
+
+## Alta del primer usuario real
+
+Después de inicializar producción y entrar con el usuario demo administrador, crea cuanto antes una cuenta real de administración:
+
+1. Entra en `/users` con un usuario `ADMIN`.
+2. Completa **Nombre**, **Email**, **Contraseña inicial**, **Rol**, **Áreas** y el estado **Activo**.
+3. Usa un rol válido del sistema: `ADMIN`, `JEFATURA`, `COORDINADOR_AREA`, `FARMACEUTICO`, `TECNICO`, `ADMINISTRATIVO` o `INVITADO`.
+4. Entrega la contraseña temporal por un canal seguro y pide al usuario que la cambie en el primer acceso operativo.
+5. Verifica que la cuenta nueva puede iniciar sesión.
+
+Por seguridad, tras confirmar que existe al menos un administrador real, cambia la contraseña de las cuentas demo o desactívalas desde `/users`. No mantengas en producción `admin@farmahub360.local` con la contraseña demo `Demo1234!`.
+
 ## Scripts útiles
 
 ```bash
