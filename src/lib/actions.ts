@@ -9,6 +9,7 @@ import { requireUser } from './session';
 import { audit } from './data';
 import { canManageUsers } from './permissions';
 import { areaDescriptions, initialAreaNames } from './catalog';
+import { containsPatientSpecificText, generatePacReference, patientWarningParams, sanitizePatientIdentifiers } from './patientProtection';
 
 type Entity = 'task'|'event'|'incident'|'project';
 const entityType = { task: 'TASK', event: 'EVENT', incident: 'INCIDENT', project: 'PROJECT' } as const;
@@ -133,20 +134,31 @@ function taskRedirect(message: string): never {
 export async function saveTask(fd: FormData) {
   const user = await current();
   const id = opt(fd, 'id');
-  const title = str(fd, 'title');
+  const titleInput = str(fd, 'title');
+  const descriptionInput = opt(fd, 'description');
+  const commentInput = str(fd, 'comment');
+  const taskType = str(fd, 'taskType') || 'GESTION_INTERNA';
+  const pacReference = opt(fd, 'pseudonymizedReference') || generatePacReference();
+  const cleanTitle = sanitizePatientIdentifiers(titleInput, pacReference);
+  const cleanDescription = sanitizePatientIdentifiers(descriptionInput, pacReference);
+  const cleanComment = sanitizePatientIdentifiers(commentInput, pacReference);
+  const title = cleanTitle.text;
+  const wasSanitized = cleanTitle.replaced || cleanDescription.replaced || cleanComment.replaced;
+  const wasPatientSpecific = taskType === 'PACIENTE_ESPECIFICA' || wasSanitized || containsPatientSpecificText(titleInput, descriptionInput, commentInput);
   const areaId = opt(fd, 'areaId');
   const priority = str(fd, 'priority');
   const status = str(fd, 'status');
   const visibility = str(fd, 'visibility');
   if (!title || !areaId || !priority || !status || !visibility || visibility === 'CUSTOM') taskRedirect('Completa los campos obligatorios: título, área, estado, prioridad y visibilidad.');
-  const data: any = { title, description: opt(fd, 'description'), areaId, responsibleId: opt(fd, 'responsibleId'), dueDate: date(fd, 'dueDate'), priority, status, visibility, projectId: opt(fd, 'projectId') };
+  if (wasPatientSpecific && (!areaId || !opt(fd, 'responsibleId') || !date(fd, 'dueDate'))) taskRedirect('En tareas paciente-específicas son obligatorios área, responsable y fecha límite.');
+  const data: any = { title, description: cleanDescription.text || undefined, taskType: wasPatientSpecific ? 'PACIENTE_ESPECIFICA' : taskType, pseudonymizedReference: wasPatientSpecific ? pacReference : opt(fd, 'pseudonymizedReference'), referenceCircuit: opt(fd, 'referenceCircuit'), areaId, responsibleId: opt(fd, 'responsibleId'), dueDate: date(fd, 'dueDate'), priority, status, visibility: wasPatientSpecific && visibility === 'GLOBAL' ? 'AREA' : visibility, projectId: opt(fd, 'projectId') };
   const row = id ? await prisma.task.update({ where: { id }, data }) : await prisma.task.create({ data: { ...data, createdById: user.id } });
   await syncLinks('task', row.id, list(fd, 'assigneeIds'));
-  await syncComments('task', row.id, str(fd, 'comment'), user.id);
+  await syncComments('task', row.id, cleanComment.text, user.id);
   await audit(user.id, id ? 'UPDATE' : 'CREATE', 'TASK', row.id, row.title);
   revalidatePath('/tasks');
   revalidatePath('/');
-  redirect(`/tasks?detail=${row.id}`);
+  redirect(`/tasks?${new URLSearchParams({ detail: row.id, ...patientWarningParams(wasPatientSpecific, wasSanitized) }).toString()}`);
 }
 
 export async function changeTaskStatus(fd: FormData) {
@@ -162,20 +174,23 @@ export async function changeTaskStatus(fd: FormData) {
 export async function addTaskComment(fd: FormData) {
   const user = await current();
   const id = str(fd, 'id');
-  const text = str(fd, 'comment');
+  const rawText = str(fd, 'comment');
+  const pacReference = generatePacReference();
+  const clean = sanitizePatientIdentifiers(rawText, pacReference);
+  const text = clean.text;
   if (!text) redirect(`/tasks?detail=${id}&error=No se permiten comentarios vacíos.`);
   await syncComments('task', id, text, user.id);
   const task = await prisma.task.findUnique({ where: { id }, select: { title: true } });
   await audit(user.id, 'COMMENT', 'TASK', id, task?.title ?? 'Comentario en tarea');
   revalidatePath('/tasks');
-  redirect(`/tasks?detail=${id}`);
+  redirect(`/tasks?${new URLSearchParams({ detail: id, ...patientWarningParams(containsPatientSpecificText(rawText) || clean.replaced, clean.replaced) }).toString()}`);
 }
 
 export async function deleteTask(fd: FormData) { const user=await current(); const task=await prisma.task.update({where:{id:str(fd,'id')},data:{deletedAt:new Date(),status:'CANCELADA'}}); await audit(user.id,'DELETE','TASK',task.id,task.title); revalidatePath('/tasks'); revalidatePath('/'); }
 export async function saveEvent(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ title:str(fd,'title'), description:opt(fd,'description'), type:str(fd,'type')||'OTRO', startAt:new Date(str(fd,'startAt')), endAt:new Date(str(fd,'endAt')), areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), priority:str(fd,'priority')||'MEDIA', visibility:str(fd,'visibility')||'GLOBAL' };
  const row=id?await prisma.event.update({where:{id},data}):await prisma.event.create({data:{...data,createdById:user.id}}); await syncLinks('event',row.id,list(fd,'assigneeIds')); await syncComments('event',row.id,str(fd,'comment'),user.id); revalidatePath('/events'); redirect('/events'); }
-export async function saveIncident(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ title:str(fd,'title'), description:opt(fd,'description'), category:str(fd,'category')||'OTRO', areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), priority:str(fd,'priority')||'MEDIA', status:str(fd,'status')||'PENDIENTE', actions:opt(fd,'actions'), detectedAt:date(fd,'detectedAt')||new Date(), resolvedAt:date(fd,'resolvedAt') };
- const row=id?await prisma.incident.update({where:{id},data}):await prisma.incident.create({data:{...data,createdById:user.id}}); await syncComments('incident',row.id,str(fd,'comment'),user.id); await audit(user.id,id?'UPDATE':'CREATE','INCIDENT',row.id,row.title); revalidatePath('/incidents'); revalidatePath('/'); redirect(`/incidents?detail=${row.id}`); }
+export async function saveIncident(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const pacReference=opt(fd,'pseudonymizedReference')||generatePacReference(); const cleanTitle=sanitizePatientIdentifiers(str(fd,'title'),pacReference); const cleanDescription=sanitizePatientIdentifiers(opt(fd,'description'),pacReference); const cleanActions=sanitizePatientIdentifiers(opt(fd,'actions'),pacReference); const cleanComment=sanitizePatientIdentifiers(str(fd,'comment'),pacReference); const wasSanitized=cleanTitle.replaced||cleanDescription.replaced||cleanActions.replaced||cleanComment.replaced; const wasPatientSpecific=wasSanitized||containsPatientSpecificText(str(fd,'title'),opt(fd,'description'),opt(fd,'actions'),str(fd,'comment')); const data:any={ title:cleanTitle.text, description:cleanDescription.text||undefined, category:str(fd,'category')||'OTRO', areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), priority:str(fd,'priority')||'MEDIA', status:str(fd,'status')||'PENDIENTE', actions:cleanActions.text||undefined, detectedAt:date(fd,'detectedAt')||new Date(), resolvedAt:date(fd,'resolvedAt'), taskType:wasPatientSpecific?'PACIENTE_ESPECIFICA':'INCIDENCIA_CIRCUITO', pseudonymizedReference:wasPatientSpecific?pacReference:opt(fd,'pseudonymizedReference'), referenceCircuit:opt(fd,'referenceCircuit') };
+ const row=id?await prisma.incident.update({where:{id},data}):await prisma.incident.create({data:{...data,createdById:user.id}}); await syncComments('incident',row.id,cleanComment.text,user.id); await audit(user.id,id?'UPDATE':'CREATE','INCIDENT',row.id,row.title); revalidatePath('/incidents'); revalidatePath('/'); redirect(`/incidents?${new URLSearchParams({detail:row.id,...patientWarningParams(wasPatientSpecific,wasSanitized)}).toString()}`); }
 export async function changeIncidentStatus(fd: FormData) { const user=await current(); const id=str(fd,'id'); const status=str(fd,'status') as Status; const incident=await prisma.incident.update({where:{id},data:{status}}); await audit(user.id,'STATUS_CHANGE','INCIDENT',incident.id,`${incident.title}: ${status}`); revalidatePath('/incidents'); revalidatePath('/'); }
 export async function saveProject(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ name:str(fd,'name'), description:opt(fd,'description'), areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), startDate:date(fd,'startDate'), expectedEndDate:date(fd,'expectedEndDate'), status:str(fd,'status')||'EN_CURSO', priority:str(fd,'priority')||'MEDIA', visibility:str(fd,'visibility')||'GLOBAL' };
  const row=id?await prisma.project.update({where:{id},data}):await prisma.project.create({data:{...data,createdById:user.id}}); await syncLinks('project',row.id,list(fd,'participantIds')); await syncComments('project',row.id,str(fd,'comment'),user.id); revalidatePath('/projects'); redirect('/projects'); }

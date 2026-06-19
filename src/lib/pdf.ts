@@ -30,7 +30,7 @@ export function basicPdf(title: string, subtitle: string, sections: { heading: s
     pageLines.push({ text: section.heading, size: 12 });
     for (const line of section.lines) for (const part of wrap(line)) pageLines.push({ text: part, size: 9 });
   }
-  pageLines.push({ text: 'No introducir ni compartir información clínica identificable ni datos personales de pacientes.', size: 8 });
+  pageLines.push({ text: 'Documento de gestión interna. La identificación del paciente, si procede, debe realizarse en el sistema corporativo autorizado.', size: 8 });
   pageLines.push({ text: 'FarmaHub360 · Desarrollado por Ramón Morillo · 2026', size: 8 });
 
   let y = 800;

@@ -4,7 +4,8 @@ import { requireUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { secureWhere } from '@/lib/data';
 import { addTaskComment, changeTaskStatus, deleteTask, saveTask } from '@/lib/actions';
-import { Filters, MultiUsers, Select, Text, TextArea, VisibilitySelect, areaOptions, priorities, priorityLabels, projectOptions, statusLabels, statuses, userOptions, visibilityLabels } from '@/components/AdminForms';
+import { Filters, MultiUsers, Select, Text, TextArea, VisibilitySelect, areaOptions, priorities, priorityLabels, projectOptions, referenceCircuits, statusLabels, statuses, taskTypeLabels, taskTypes, userOptions, visibilityLabels } from '@/components/AdminForms';
+import { patientIdentifierReplacedNotice, patientIdentityNotice, patientSpecificNotice } from '@/lib/patientProtection';
 import { PriorityBadge, StatusBadge, VisibilityBadge } from '@/components/Badges';
 
 function dateTimeValue(value?: Date | null) {
@@ -66,8 +67,12 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
     <form action={saveTask} className="card grid gap-3 md:grid-cols-2">
       {r && <input type="hidden" name="id" value={r.id} />}
       <Text name="title" label="Título" value={r?.title} required />
+      <Select name="taskType" label="Tipo de tarea" options={taskTypes} value={r?.taskType ?? 'GESTION_INTERNA'} required />
       <Select name="areaId" label="Área" options={areaOptions(areas)} value={r?.areaId} required />
       <TextArea name="description" label="Descripción" value={r?.description} />
+      <Text name="pseudonymizedReference" label="Referencia seudonimizada" value={r?.pseudonymizedReference} />
+      <Select name="referenceCircuit" label="Circuito oficial de referencia" options={referenceCircuits} value={r?.referenceCircuit} />
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 md:col-span-2"><p>{patientSpecificNotice}</p><p className="mt-2 font-semibold">{patientIdentityNotice}</p><p className="mt-2 text-xs">Si la tarea es paciente-específica, se recomienda visibilidad “Solo el área seleccionada” o “Solo responsables/asignados”; área, responsable y fecha límite serán obligatorios.</p></div>
       <Select name="status" label="Estado" options={statuses} value={r?.status} required />
       <Select name="priority" label="Prioridad" options={priorities} value={r?.priority} required />
       <Select name="responsibleId" label="Responsable" options={userOptions(users)} value={r?.responsibleId} />
@@ -88,6 +93,8 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
       </div>
       <Filters areas={areas} users={users} values={searchParams} />
       {searchParams.error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{searchParams.error}</div>}
+      {searchParams.patientWarning && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{patientSpecificNotice}</div>}
+      {searchParams.sanitized && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{patientIdentifierReplacedNotice}</div>}
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead><tr className="border-b text-xs uppercase text-slate-500"><th className="py-2">Tarea</th><th>Área</th><th>Responsable</th><th>Estado</th><th>Prioridad</th><th>Fecha límite</th><th>Visibilidad</th><th>Acciones</th></tr></thead>
@@ -104,7 +111,7 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
         <div className="mt-3">{form()}</div>
       </details>
 
-      {selected && <section className="card grid gap-4"><h3 className="text-xl font-bold">Detalle: {selected.title}</h3><p>{selected.description ?? 'Sin descripción'}</p><div className="grid gap-2 text-sm md:grid-cols-3"><p><b>Área:</b> {selected.area?.name ?? '—'}</p><p><b>Responsable:</b> {selected.responsible?.name ?? '—'}</p><p><b>Proyecto:</b> {selected.project?.name ?? '—'}</p><p><b>Estado:</b> {statusLabels[selected.status]}</p><p><b>Prioridad:</b> {priorityLabels[selected.priority]}</p><p><b>Visibilidad:</b> {visibilityLabels[selected.visibility]}</p><p><b>Asignados:</b> {selected.assignees.map((a) => a.user.name).join(', ') || '—'}</p></div><form action={addTaskComment} className="grid gap-2"><input type="hidden" name="id" value={selected.id} /><TextArea name="comment" label="Nuevo comentario" /><button className="btn w-fit">Añadir comentario</button></form><div><h4 className="font-semibold">Comentarios</h4>{selected.comments.map((c) => <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm" key={c.id}><b>{c.author.name}</b> · {c.createdAt.toLocaleString('es-ES')}<br />{c.text}</p>)}</div><div><h4 className="font-semibold">Historial</h4>{audits.map((a) => <p className="mt-2 text-sm" key={a.id}>{a.createdAt.toLocaleString('es-ES')} · {a.user?.name ?? 'Sistema'} · {a.action} · {a.summary}</p>)}</div></section>}
+      {selected && <section className="card grid gap-4">{selected.taskType === 'PACIENTE_ESPECIFICA' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{patientIdentityNotice}</div>}<h3 className="text-xl font-bold">Detalle: {selected.title}</h3><p>{selected.description ?? 'Sin descripción'}</p><div className="grid gap-2 text-sm md:grid-cols-3"><p><b>Área:</b> {selected.area?.name ?? '—'}</p><p><b>Responsable:</b> {selected.responsible?.name ?? '—'}</p><p><b>Proyecto:</b> {selected.project?.name ?? '—'}</p><p><b>Estado:</b> {statusLabels[selected.status]}</p><p><b>Prioridad:</b> {priorityLabels[selected.priority]}</p><p><b>Visibilidad:</b> {visibilityLabels[selected.visibility]}</p><p><b>Tipo de tarea:</b> {taskTypeLabels[selected.taskType]}</p><p><b>Referencia PAC:</b> {selected.pseudonymizedReference ?? '—'}</p><p><b>Circuito oficial:</b> {selected.referenceCircuit ?? '—'}</p><p><b>Asignados:</b> {selected.assignees.map((a) => a.user.name).join(', ') || '—'}</p></div><form action={addTaskComment} className="grid gap-2"><input type="hidden" name="id" value={selected.id} /><TextArea name="comment" label="Nuevo comentario" /><button className="btn w-fit">Añadir comentario</button></form><div><h4 className="font-semibold">Comentarios</h4>{selected.comments.map((c) => <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm" key={c.id}><b>{c.author.name}</b> · {c.createdAt.toLocaleString('es-ES')}<br />{c.text}</p>)}</div><div><h4 className="font-semibold">Historial</h4>{audits.map((a) => <p className="mt-2 text-sm" key={a.id}>{a.createdAt.toLocaleString('es-ES')} · {a.user?.name ?? 'Sistema'} · {a.action} · {a.summary}</p>)}</div></section>}
     </Shell>
   );
 }
