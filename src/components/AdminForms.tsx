@@ -77,6 +77,27 @@ export function VisibilitySelect({ value }: { value?: string | null }) {
   return <div className="grid gap-2 text-sm md:col-span-2"><Select name="visibility" label="Visibilidad" options={visibilities} value={selected} required/><div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600"><p className="font-medium text-slate-700">Ayuda de visibilidad</p><ul className="mt-1 list-disc space-y-1 pl-5">{Object.values(visibilityHelp).map((text) => <li key={text}>{text}</li>)}</ul></div></div>;
 }
 
-export function Filters({ areas, users }: { areas: { id: string; name: string }[]; users: { id: string; name: string }[] }) {
-  return <form className="card grid gap-3 md:grid-cols-5"><input className="input" name="q" placeholder="Buscar"/><select className="input" name="area"><option value="">Área</option>{areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select><select className="input" name="status"><option value="">Estado</option>{statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><select className="input" name="priority"><option value="">Prioridad</option>{priorities.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}</select><select className="input" name="responsible"><option value="">Responsable</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select><button className="btn md:col-span-5">Filtrar</button></form>;
+export function Filters({ areas, users, values = {} }: { areas: { id: string; name: string }[]; users: { id: string; name: string }[]; values?: Record<string, string | undefined> }) {
+  return (
+    <form className="card grid gap-3 md:grid-cols-5">
+      <input className="input" name="q" placeholder="Buscar" defaultValue={values.q ?? ''} />
+      <select className="input" name="area" defaultValue={values.area ?? ''}>
+        <option value="">Área</option>
+        {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+      </select>
+      <select className="input" name="status" defaultValue={values.status ?? ''}>
+        <option value="">Estado</option>
+        {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+      </select>
+      <select className="input" name="priority" defaultValue={values.priority ?? ''}>
+        <option value="">Prioridad</option>
+        {priorities.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
+      </select>
+      <select className="input" name="responsible" defaultValue={values.responsible ?? ''}>
+        <option value="">Responsable</option>
+        {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+      </select>
+      <button className="btn md:col-span-5">Filtrar</button>
+    </form>
+  );
 }
