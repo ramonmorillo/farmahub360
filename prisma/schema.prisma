@@ -53,6 +53,25 @@ enum EventType {
   OTRO
 }
 
+enum TaskType {
+  GESTION_INTERNA
+  ORGANIZATIVA
+  DOCENCIA
+  INVESTIGACION
+  CALIDAD_SEGURIDAD
+  INCIDENCIA_CIRCUITO
+  PACIENTE_ESPECIFICA
+}
+
+enum ReferenceCircuit {
+  PRESCRIPCION_ELECTRONICA
+  HOJA_ELABORACION
+  HISTORIA_CLINICA
+  SISTEMA_FARMACOTECNIA
+  SISTEMA_DISPENSACION
+  OTRO
+}
+
 enum IncidentCategory {
   CIRCUITO_ASISTENCIAL
   STOCK_DESABASTECIMIENTO
@@ -153,6 +172,9 @@ model Task {
   id          String  @id @default(cuid())
   title       String
   description String?
+  taskType TaskType @default(GESTION_INTERNA)
+  pseudonymizedReference String?
+  referenceCircuit ReferenceCircuit?
 
   areaId String?
   area   Area?   @relation(fields: [areaId], references: [id])
@@ -199,6 +221,9 @@ model Incident {
   resolvedAt DateTime?
   actions    String?
   visibility Visibility @default(GLOBAL)
+  taskType TaskType @default(INCIDENCIA_CIRCUITO)
+  pseudonymizedReference String?
+  referenceCircuit ReferenceCircuit?
 
   createdById String
   createdBy   User   @relation("IncidentCreatedBy", fields: [createdById], references: [id])

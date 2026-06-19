@@ -1,4 +1,4 @@
-import { EventType, IncidentCategory, Priority, Role, Status, Visibility } from '@prisma/client';
+import { EventType, IncidentCategory, Priority, ReferenceCircuit, Role, Status, TaskType, Visibility } from '@prisma/client';
 
 type Option = string | { value: string; label: string };
 
@@ -25,6 +25,25 @@ export const visibilityLabels: Record<Visibility, string> = {
   CUSTOM: 'Personalizado'
 };
 
+export const taskTypeLabels: Record<TaskType, string> = {
+  GESTION_INTERNA: 'Gestión interna',
+  ORGANIZATIVA: 'Organizativa',
+  DOCENCIA: 'Docencia',
+  INVESTIGACION: 'Investigación',
+  CALIDAD_SEGURIDAD: 'Calidad/seguridad',
+  INCIDENCIA_CIRCUITO: 'Incidencia de circuito',
+  PACIENTE_ESPECIFICA: 'Paciente-específica'
+};
+
+export const referenceCircuitLabels: Record<ReferenceCircuit, string> = {
+  PRESCRIPCION_ELECTRONICA: 'Prescripción electrónica',
+  HOJA_ELABORACION: 'Hoja de elaboración',
+  HISTORIA_CLINICA: 'Historia clínica',
+  SISTEMA_FARMACOTECNIA: 'Sistema de Farmacotecnia',
+  SISTEMA_DISPENSACION: 'Sistema de dispensación',
+  OTRO: 'Otro'
+};
+
 export const visibilityHelp: Record<Exclude<Visibility, 'CUSTOM'>, string> = {
   GLOBAL: 'Todo el servicio: visible para todos los usuarios autenticados.',
   AREA: 'Solo el área seleccionada: visible para usuarios pertenecientes al área indicada.',
@@ -34,6 +53,8 @@ export const visibilityHelp: Record<Exclude<Visibility, 'CUSTOM'>, string> = {
 
 export const priorities = Object.values(Priority).map((value) => ({ value, label: priorityLabels[value] }));
 export const statuses = Object.values(Status).map((value) => ({ value, label: statusLabels[value] }));
+export const taskTypes = Object.values(TaskType).map((value) => ({ value, label: taskTypeLabels[value] }));
+export const referenceCircuits = Object.values(ReferenceCircuit).map((value) => ({ value, label: referenceCircuitLabels[value] }));
 export const visibilities = Object.values(Visibility)
   .filter((value) => value !== 'CUSTOM')
   .map((value) => ({ value, label: visibilityLabels[value] }));

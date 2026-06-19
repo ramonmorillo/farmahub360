@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     { heading: 'Información', lines: [`Título: ${task.title}`, `Descripción: ${task.description ?? '—'}`, `Área: ${task.area?.name ?? '—'}`, `Responsable: ${task.responsible?.name ?? '—'}`, `Usuarios asignados: ${task.assignees.map((a: any) => a.user.name).join(', ') || '—'}`, `Estado: ${(statusLabels as Record<string, string>)[task.status]}`, `Prioridad: ${(priorityLabels as Record<string, string>)[task.priority]}`, `Fecha límite: ${task.dueDate?.toLocaleString('es-ES') ?? '—'}`, `Visibilidad: ${(visibilityLabels as Record<string, string>)[task.visibility]}`] },
     { heading: 'Comentarios', lines: task.comments.map((c: any) => `${c.createdAt.toLocaleString('es-ES')} · ${c.author.name}: ${c.text}`) },
     { heading: 'Historial', lines: audits.map((a: any) => `${a.createdAt.toLocaleString('es-ES')} · ${a.user?.name ?? 'Sistema'} · ${a.action} · ${a.summary}`) },
-    { heading: 'Aviso', lines: ['Documento generado desde FarmaHub360. No debe contener datos clínicos identificables de pacientes.'] },
+    { heading: 'Aviso', lines: ['Documento de gestión interna. La identificación del paciente, si procede, debe realizarse en el sistema corporativo autorizado.'] },
   ]);
   return new NextResponse(pdf, { headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="tarea-${task.id}.pdf"` } });
 }
