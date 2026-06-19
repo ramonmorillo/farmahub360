@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { secureWhere } from '@/lib/data';
 import { addTaskComment, changeTaskStatus, deleteTask, saveTask } from '@/lib/actions';
 import { Filters, MultiUsers, Select, Text, TextArea, VisibilitySelect, areaOptions, priorities, priorityLabels, projectOptions, statusLabels, statuses, userOptions, visibilityLabels } from '@/components/AdminForms';
+import { PriorityBadge, StatusBadge, VisibilityBadge } from '@/components/Badges';
 
 function dateTimeValue(value?: Date | null) {
   if (!value) return '';
@@ -33,7 +34,7 @@ function pdfHref(searchParams: Record<string, string | undefined>) {
     if (value) params.set(key, value);
   }
   const query = params.toString();
-  return `/api/pdf/tasks${query ? `?${query}` : ''}`;
+  return `/tasks/print${query ? `?${query}` : ''}`;
 }
 
 export default async function Page({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -83,7 +84,7 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
     <Shell>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-3xl font-bold">Tareas</h2>
-        <div className="flex flex-wrap gap-2"><Link className="btn" href="#new">Nueva tarea</Link><a className="btn" href={exportHref(searchParams)}>Exportar CSV</a><a className="btn" href={pdfHref(searchParams)}>Generar PDF</a></div>
+        <div className="flex flex-wrap gap-2"><Link className="btn" href="#new">Nueva tarea</Link><a className="btn" href={exportHref(searchParams)}>Exportar CSV</a><a className="btn" href={pdfHref(searchParams)}>Generar PDF listado</a></div>
       </div>
       <Filters areas={areas} users={users} values={searchParams} />
       {searchParams.error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{searchParams.error}</div>}
@@ -92,8 +93,8 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
           <thead><tr className="border-b text-xs uppercase text-slate-500"><th className="py-2">Tarea</th><th>Área</th><th>Responsable</th><th>Estado</th><th>Prioridad</th><th>Fecha límite</th><th>Visibilidad</th><th>Acciones</th></tr></thead>
           <tbody>{rows.map((r) => <tr className="border-b align-top last:border-0" key={r.id}>
             <td className="max-w-sm py-3"><b>{r.title}</b><p className="mt-1 text-slate-600">{short(r.description)}</p></td>
-            <td>{r.area?.name ?? 'Sin área'}</td><td>{r.responsible?.name ?? 'Sin responsable'}</td><td>{statusLabels[r.status]}</td><td>{priorityLabels[r.priority]}</td><td>{r.dueDate?.toLocaleDateString('es-ES') ?? '—'}</td><td>{visibilityLabels[r.visibility]}</td>
-            <td className="min-w-52 space-y-2"><Link className="btn inline-block" href={`/tasks?detail=${r.id}`}>Ver detalle</Link><a className="btn inline-block" href={`/api/pdf/tasks/${r.id}`}>Generar PDF individual</a><details><summary className="btn cursor-pointer">Editar</summary>{form(r)}<form action={deleteTask}><input type="hidden" name="id" value={r.id} /><button className="btn mt-2">Eliminar lógico</button></form></details><form action={changeTaskStatus} className="flex gap-2"><input type="hidden" name="id" value={r.id} /><select className="input" name="status" defaultValue={r.status}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select><button className="btn">Cambiar</button></form></td>
+            <td>{r.area?.name ?? 'Sin área'}</td><td>{r.responsible?.name ?? 'Sin responsable'}</td><td><StatusBadge value={r.status} /></td><td><PriorityBadge value={r.priority} /></td><td>{r.dueDate?.toLocaleDateString('es-ES') ?? '—'}</td><td><VisibilityBadge value={r.visibility} /></td>
+            <td className="min-w-52 space-y-2"><Link className="btn inline-block" href={`/tasks?detail=${r.id}`}>Ver detalle</Link><a className="btn inline-block" href={`/tasks/${r.id}/print`}>PDF</a><details><summary className="btn cursor-pointer">Editar</summary>{form(r)}<form action={deleteTask}><input type="hidden" name="id" value={r.id} /><button className="btn mt-2">Eliminar lógico</button></form></details><form action={changeTaskStatus} className="flex gap-2"><input type="hidden" name="id" value={r.id} /><select className="input" name="status" defaultValue={r.status}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select><button className="btn">Cambiar</button></form></td>
           </tr>)}</tbody>
         </table>
       </div>

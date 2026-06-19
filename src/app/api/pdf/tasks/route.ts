@@ -10,6 +10,6 @@ function filters(url: URL) { const where: any = {}; const q = url.searchParams.g
 export async function GET(request: Request) {
   const user = await requireUser();
   const rows = await prisma.task.findMany({ where: { AND: [secureWhere(user, true, false), filters(new URL(request.url))] }, include: { area: true, responsible: true }, orderBy: { updatedAt: 'desc' }, take: 200 });
-  const pdf = basicPdf('Listado filtrado de tareas', `${rows.length} tareas visibles según filtros activos`, [{ heading: 'Tareas', lines: rows.map((r) => `${r.title} | ${r.area?.name ?? 'Sin área'} | ${r.responsible?.name ?? 'Sin responsable'} | ${statusLabels[r.status]} | ${priorityLabels[r.priority]} | ${r.dueDate?.toLocaleDateString('es-ES') ?? 'Sin fecha'} | ${visibilityLabels[r.visibility]}`) }]);
+  const pdf = basicPdf('Listado filtrado de tareas', `${rows.length} tareas visibles según filtros activos`, [{ heading: 'Tareas', lines: rows.length ? rows.map((r) => `${r.title} | ${r.area?.name ?? 'Sin área'} | ${r.responsible?.name ?? 'Sin responsable'} | ${statusLabels[r.status]} | ${priorityLabels[r.priority]} | ${r.dueDate?.toLocaleDateString('es-ES') ?? 'Sin fecha'} | ${visibilityLabels[r.visibility]}`) : ['No existen registros para los filtros seleccionados.'] }]);
   return new NextResponse(pdf, { headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="tareas.pdf"' } });
 }
