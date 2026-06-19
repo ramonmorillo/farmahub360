@@ -1,6 +1,6 @@
 'use server';
 
-import { Prisma, Role } from '@prisma/client';
+import { Prisma, Role, Status } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { hash } from 'bcryptjs';
@@ -126,9 +126,52 @@ async function syncLinks(kind: Entity, id: string, userIds: string[]) {
   await map[kind].deleteMany({ where:{ [fk[kind]]: id } });
   if (userIds.length) await map[kind].createMany({ data:userIds.map(userId=>({ [fk[kind]]:id, userId })), skipDuplicates:true });
 }
-export async function saveTask(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const title=str(fd,'title'); const areaId=opt(fd,'areaId'); const priority=str(fd,'priority'); const status=str(fd,'status'); const visibility=str(fd,'visibility'); if(!title||!areaId||!priority||!status||!visibility) redirect('/tasks?error=Completa los campos obligatorios: título, área, estado, prioridad y visibilidad.'); const data:any={ title, description:opt(fd,'description'), areaId, responsibleId:opt(fd,'responsibleId'), dueDate:date(fd,'dueDate'), priority, status, visibility, projectId:opt(fd,'projectId') };
- const row=id?await prisma.task.update({where:{id},data}):await prisma.task.create({data:{...data,createdById:user.id}}); await syncLinks('task',row.id,list(fd,'assigneeIds')); await syncComments('task',row.id,str(fd,'comment'),user.id); await audit(user.id,id?'UPDATE':'CREATE','TASK',row.id,row.title); revalidatePath('/tasks'); redirect('/tasks'); }
-export async function deleteTask(fd: FormData) { const user=await current(); await prisma.task.update({where:{id:str(fd,'id')},data:{deletedAt:new Date(),status:'CANCELADA'}}); revalidatePath('/tasks'); }
+function taskRedirect(message: string): never {
+  redirect(`/tasks?${new URLSearchParams({ error: message }).toString()}`);
+}
+
+export async function saveTask(fd: FormData) {
+  const user = await current();
+  const id = opt(fd, 'id');
+  const title = str(fd, 'title');
+  const areaId = opt(fd, 'areaId');
+  const priority = str(fd, 'priority');
+  const status = str(fd, 'status');
+  const visibility = str(fd, 'visibility');
+  if (!title || !areaId || !priority || !status || !visibility || visibility === 'CUSTOM') taskRedirect('Completa los campos obligatorios: título, área, estado, prioridad y visibilidad.');
+  const data: any = { title, description: opt(fd, 'description'), areaId, responsibleId: opt(fd, 'responsibleId'), dueDate: date(fd, 'dueDate'), priority, status, visibility, projectId: opt(fd, 'projectId') };
+  const row = id ? await prisma.task.update({ where: { id }, data }) : await prisma.task.create({ data: { ...data, createdById: user.id } });
+  await syncLinks('task', row.id, list(fd, 'assigneeIds'));
+  await syncComments('task', row.id, str(fd, 'comment'), user.id);
+  await audit(user.id, id ? 'UPDATE' : 'CREATE', 'TASK', row.id, row.title);
+  revalidatePath('/tasks');
+  revalidatePath('/');
+  redirect(`/tasks?detail=${row.id}`);
+}
+
+export async function changeTaskStatus(fd: FormData) {
+  const user = await current();
+  const id = str(fd, 'id');
+  const status = str(fd, 'status') as Status;
+  const task = await prisma.task.update({ where: { id }, data: { status } });
+  await audit(user.id, 'STATUS_CHANGE', 'TASK', task.id, `${task.title}: ${status}`);
+  revalidatePath('/tasks');
+  revalidatePath('/');
+}
+
+export async function addTaskComment(fd: FormData) {
+  const user = await current();
+  const id = str(fd, 'id');
+  const text = str(fd, 'comment');
+  if (!text) redirect(`/tasks?detail=${id}&error=No se permiten comentarios vacíos.`);
+  await syncComments('task', id, text, user.id);
+  const task = await prisma.task.findUnique({ where: { id }, select: { title: true } });
+  await audit(user.id, 'COMMENT', 'TASK', id, task?.title ?? 'Comentario en tarea');
+  revalidatePath('/tasks');
+  redirect(`/tasks?detail=${id}`);
+}
+
+export async function deleteTask(fd: FormData) { const user=await current(); const task=await prisma.task.update({where:{id:str(fd,'id')},data:{deletedAt:new Date(),status:'CANCELADA'}}); await audit(user.id,'DELETE','TASK',task.id,task.title); revalidatePath('/tasks'); revalidatePath('/'); }
 export async function saveEvent(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ title:str(fd,'title'), description:opt(fd,'description'), type:str(fd,'type')||'OTRO', startAt:new Date(str(fd,'startAt')), endAt:new Date(str(fd,'endAt')), areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), priority:str(fd,'priority')||'MEDIA', visibility:str(fd,'visibility')||'GLOBAL' };
  const row=id?await prisma.event.update({where:{id},data}):await prisma.event.create({data:{...data,createdById:user.id}}); await syncLinks('event',row.id,list(fd,'assigneeIds')); await syncComments('event',row.id,str(fd,'comment'),user.id); revalidatePath('/events'); redirect('/events'); }
 export async function saveIncident(fd: FormData) { const user=await current(); const id=opt(fd,'id'); const data:any={ title:str(fd,'title'), description:opt(fd,'description'), category:str(fd,'category')||'OTRO', areaId:opt(fd,'areaId'), responsibleId:opt(fd,'responsibleId'), priority:str(fd,'priority')||'MEDIA', status:str(fd,'status')||'PENDIENTE', actions:opt(fd,'actions'), detectedAt:date(fd,'detectedAt')||new Date(), resolvedAt:date(fd,'resolvedAt') };
